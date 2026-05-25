@@ -121,7 +121,7 @@ pub mod board_solver {
                 }
                 return;
             }
-             for column in 0..size {
+            for column in 0..size {
                 let can_place = self.valid_placement(r, column);
                 if can_place {
                     self.horizontal[column] = true;
@@ -199,8 +199,8 @@ fn main() {
     bs.try_place(0, &mut count);
     println!("Solutions: {}", count);
 
-    let  count =0;
-    let arc_count =Arc::new(RwLock::new(count));
+    let count = 0;
+    let arc_count = Arc::new(RwLock::new(count));
     bs.try_place_mt(0, Arc::clone(&arc_count));
     println!("Solutions: {}", arc_count.read().unwrap());
 }
@@ -255,28 +255,27 @@ mod tests {
     #[test]
     fn works_for_n_1_to_4_multithreaded() {
         let mut bs = BoardSolver::<1>::new();
-        let count= Arc::<_>::new(RwLock::new(0));
-        bs.try_place_mt(0,Arc::clone(&count));
+        let count = Arc::<_>::new(RwLock::new(0));
+        bs.try_place_mt(0, Arc::clone(&count));
         let count = *count.read().unwrap();
         assert!(count == 1, "solution for 1 invalid");
 
         let mut bs = BoardSolver::<2>::new();
-         let count= Arc::<_>::new(RwLock::new(0));
-        bs.try_place_mt(0,Arc::clone(&count));
+        let count = Arc::<_>::new(RwLock::new(0));
+        bs.try_place_mt(0, Arc::clone(&count));
         let count = *count.read().unwrap();
-        assert!(count  == 0, "solution for 2 invalid");
+        assert!(count == 0, "solution for 2 invalid");
 
         let mut bs = BoardSolver::<3>::new();
-         let count= Arc::<_>::new(RwLock::new(0));
-        bs.try_place_mt(0,Arc::clone(&count));
+        let count = Arc::<_>::new(RwLock::new(0));
+        bs.try_place_mt(0, Arc::clone(&count));
         let count = *count.read().unwrap();
-        assert!(count  == 0, "solution for 3 invalid");
+        assert!(count == 0, "solution for 3 invalid");
 
         let mut bs = BoardSolver::<4>::new();
-         let count= Arc::<_>::new(RwLock::new(0));
-        bs.try_place_mt(0,Arc::clone(&count));
+        let count = Arc::<_>::new(RwLock::new(0));
+        bs.try_place_mt(0, Arc::clone(&count));
         let count = *count.read().unwrap();
-        assert!(count  == 2, "solution for 4 invalid");
+        assert!(count == 2, "solution for 4 invalid");
     }
-
 }
