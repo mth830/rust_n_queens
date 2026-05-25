@@ -2,25 +2,26 @@ use std::sync::{Arc, RwLock};
 
 pub mod board_solver {
     use std::sync::{Arc, RwLock};
-    use std::thread::Thread;
+    //use std::thread::Thread;
     const DEBUG: bool = false;
-    //#[derive(Clone, Copy)]
-    struct Board {
-        data: Vec<Vec<bool>>,
+
+    struct Board<const N: usize> {
+        data: [[bool; N]; N],
         size: usize,
     }
-    //#[derive(Clone, Copy)]
-    pub struct BoardSolver {
-        board: Board,
-        left_diagonal: Vec<bool>,
-        right_diagonal: Vec<bool>,
-        horizontal: Vec<bool>,
+
+    pub struct BoardSolver<const N: usize> {
+        board: Board<N>,
+        left_diagonal: [[bool; N]; 2],
+        right_diagonal: [[bool; N]; 2],
+        horizontal: [bool; N],
     }
-    impl Board {
-        pub fn new(size: usize) -> Self {
+
+    impl<const N: usize> Board<N> {
+        pub fn new() -> Self {
             Self {
-                data: vec![vec![false; size]; size],
-                size: size,
+                data: [[false; N]; N],
+                size: N,
             }
         }
         pub fn set(&mut self, r: usize, c: usize) {
@@ -39,13 +40,14 @@ pub mod board_solver {
             }
         }
     }
-    impl BoardSolver {
-        pub fn new(size: usize) -> Self {
+
+    impl<const N: usize> BoardSolver<N> {
+        pub fn new() -> Self {
             Self {
-                board: Board::new(size as usize),
-                left_diagonal: vec![false; 2 * size - 1],
-                right_diagonal: vec![false; 2 * size - 1],
-                horizontal: vec![false; size],
+                board: Board::<N>::new(),
+                left_diagonal: [[false; N]; 2],
+                right_diagonal: [[false; N]; 2],
+                horizontal: [false; N],
             }
         }
         fn get_right_diagonal(&self, r: usize, c: usize) -> usize {
@@ -81,19 +83,28 @@ pub mod board_solver {
                 if can_place {
                     self.horizontal[column] = true;
                     let left_diag_index = self.get_left_diagonal(r, column);
-                    let right_diag_index = self.get_right_diagonal(r, column);
+                    let left_diag_row = left_diag_index / N;
+                    let left_diag_col = left_diag_index % N;
 
-                    self.left_diagonal[left_diag_index] = true;
-                    self.right_diagonal[right_diag_index] = true;
+                    let right_diag_index = self.get_right_diagonal(r, column);
+                    let right_diag_row = right_diag_index / N;
+                    let right_diag_col = right_diag_index % N;
+
+                    self.left_diagonal[left_diag_row][left_diag_col] = true;
+                    self.right_diagonal[right_diag_row][right_diag_col] = true;
+
                     if DEBUG {
                         self.board.set(r, column);
                     }
+
                     self.try_place(r + 1, count);
+
                     if DEBUG {
                         self.board.unset(r, column);
                     }
-                    self.left_diagonal[left_diag_index] = false;
-                    self.right_diagonal[right_diag_index] = false;
+
+                    self.left_diagonal[left_diag_row][left_diag_col] = false;
+                    self.right_diagonal[right_diag_row][right_diag_col] = false;
                     self.horizontal[column] = false;
                 }
             }
@@ -117,17 +128,27 @@ pub mod board_solver {
                     let left_diag_index = self.get_left_diagonal(r, column);
                     let right_diag_index = self.get_right_diagonal(r, column);
 
-                    self.left_diagonal[left_diag_index] = true;
-                    self.right_diagonal[right_diag_index] = true;
+                    let left_diag_row = left_diag_index / N;
+                    let left_diag_col = left_diag_index % N;
+
+                    let right_diag_row = right_diag_index / N;
+                    let right_diag_col = right_diag_index % N;
+
+                    self.left_diagonal[left_diag_row][left_diag_col] = true;
+                    self.right_diagonal[right_diag_row][right_diag_col] = true;
+
                     if DEBUG {
                         self.board.set(r, column);
                     }
+
                     self.try_place_mt(r + 1, Arc::clone(&count));
+
                     if DEBUG {
                         self.board.unset(r, column);
                     }
-                    self.left_diagonal[left_diag_index] = false;
-                    self.right_diagonal[right_diag_index] = false;
+
+                    self.left_diagonal[left_diag_row][left_diag_col] = true;
+                    self.right_diagonal[right_diag_row][right_diag_col] = true;
                     self.horizontal[column] = false;
                 }
             }
@@ -139,7 +160,16 @@ pub mod board_solver {
             //let size = self.board.size;
             let left_diag_index = self.get_left_diagonal(r, c);
             let right_diag_index = self.get_right_diagonal(r, c);
-            if self.left_diagonal[left_diag_index] || self.right_diagonal[right_diag_index] {
+
+            let left_diag_row = left_diag_index / N;
+            let left_diag_col = left_diag_index % N;
+
+            let right_diag_row = right_diag_index / N;
+            let right_diag_col = right_diag_index % N;
+
+            if self.left_diagonal[left_diag_row][left_diag_col]
+                || self.right_diagonal[right_diag_row][right_diag_col]
+            {
                 return false;
             }
             true
@@ -165,10 +195,59 @@ pub mod board_solver {
 
 use board_solver::BoardSolver;
 fn main() {
-    let mut bs = BoardSolver::new(8);
+    let mut bs = BoardSolver::<8>::new();
     let mut count = 0;
     bs.try_place(0, &mut count);
     println!("Solutions: {}", count);
     bs.try_place_mt(0, Arc::new(RwLock::new(count)));
     println!("Solutions: {}", count);
+}
+mod tests {
+    #[cfg(test)]
+    use super::*;
+    #[test]
+    fn works_for_n_1_to_4() {
+        let mut bs = BoardSolver::<1>::new();
+        let mut count = 0;
+        bs.solve(&mut count);
+        assert!(count == 1, "solution for 1 invalid");
+
+        let mut bs = BoardSolver::<2>::new();
+        let mut count = 0;
+        bs.solve(&mut count);
+        assert!(count == 0, "solution for 2 invalid");
+
+        let mut bs = BoardSolver::<3>::new();
+        let mut count = 0;
+        bs.solve(&mut count);
+        assert!(count == 0, "solution for 3 invalid");
+
+        let mut bs = BoardSolver::<4>::new();
+        let mut count = 0;
+        bs.solve(&mut count);
+        assert!(count == 2, "solution for 4 invalid");
+    }
+
+    #[test]
+    fn works_for_n_5_to_8() {
+        let mut bs = BoardSolver::<5>::new();
+        let mut count = 0;
+        bs.solve(&mut count);
+        assert!(count == 10, "solution for 5 invalid");
+
+        let mut bs = BoardSolver::<6>::new();
+        let mut count = 0;
+        bs.solve(&mut count);
+        assert!(count == 4, "solution for 6 invalid");
+
+        let mut bs = BoardSolver::<7>::new();
+        let mut count = 0;
+        bs.solve(&mut count);
+        assert!(count == 40, "solution for 7 invalid");
+
+        let mut bs = BoardSolver::<8>::new();
+        let mut count = 0;
+        bs.solve(&mut count);
+        assert!(count == 92, "solution for 8 invalid");
+    }
 }
