@@ -121,16 +121,15 @@ pub mod board_solver {
                 }
                 return;
             }
-            for column in 0..size {
+             for column in 0..size {
                 let can_place = self.valid_placement(r, column);
                 if can_place {
                     self.horizontal[column] = true;
                     let left_diag_index = self.get_left_diagonal(r, column);
-                    let right_diag_index = self.get_right_diagonal(r, column);
-
                     let left_diag_row = left_diag_index / N;
                     let left_diag_col = left_diag_index % N;
 
+                    let right_diag_index = self.get_right_diagonal(r, column);
                     let right_diag_row = right_diag_index / N;
                     let right_diag_col = right_diag_index % N;
 
@@ -147,8 +146,8 @@ pub mod board_solver {
                         self.board.unset(r, column);
                     }
 
-                    self.left_diagonal[left_diag_row][left_diag_col] = true;
-                    self.right_diagonal[right_diag_row][right_diag_col] = true;
+                    self.left_diagonal[left_diag_row][left_diag_col] = false;
+                    self.right_diagonal[right_diag_row][right_diag_col] = false;
                     self.horizontal[column] = false;
                 }
             }
@@ -199,8 +198,11 @@ fn main() {
     let mut count = 0;
     bs.try_place(0, &mut count);
     println!("Solutions: {}", count);
-    bs.try_place_mt(0, Arc::new(RwLock::new(count)));
-    println!("Solutions: {}", count);
+
+    let  count =0;
+    let arc_count =Arc::new(RwLock::new(count));
+    bs.try_place_mt(0, Arc::clone(&arc_count));
+    println!("Solutions: {}", arc_count.read().unwrap());
 }
 mod tests {
     #[cfg(test)]
@@ -250,4 +252,31 @@ mod tests {
         bs.solve(&mut count);
         assert!(count == 92, "solution for 8 invalid");
     }
+    #[test]
+    fn works_for_n_1_to_4_multithreaded() {
+        let mut bs = BoardSolver::<1>::new();
+        let count= Arc::<_>::new(RwLock::new(0));
+        bs.try_place_mt(0,Arc::clone(&count));
+        let count = *count.read().unwrap();
+        assert!(count == 1, "solution for 1 invalid");
+
+        let mut bs = BoardSolver::<2>::new();
+         let count= Arc::<_>::new(RwLock::new(0));
+        bs.try_place_mt(0,Arc::clone(&count));
+        let count = *count.read().unwrap();
+        assert!(count  == 0, "solution for 2 invalid");
+
+        let mut bs = BoardSolver::<3>::new();
+         let count= Arc::<_>::new(RwLock::new(0));
+        bs.try_place_mt(0,Arc::clone(&count));
+        let count = *count.read().unwrap();
+        assert!(count  == 0, "solution for 3 invalid");
+
+        let mut bs = BoardSolver::<4>::new();
+         let count= Arc::<_>::new(RwLock::new(0));
+        bs.try_place_mt(0,Arc::clone(&count));
+        let count = *count.read().unwrap();
+        assert!(count  == 2, "solution for 4 invalid");
+    }
+
 }
