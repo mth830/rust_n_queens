@@ -135,8 +135,6 @@ pub mod board_solver {
 }
 mod board_solver_multithreaded {
     use crate::board_solver::BoardSolver;
-    use std::sync::Arc;
-    use std::sync::RwLock;
     use std::thread;
     pub struct BoardSolverMultithreaded<const N: usize> {}
     impl<const N: usize> BoardSolverMultithreaded<N> {
@@ -166,31 +164,28 @@ mod board_solver_multithreaded {
                 return 1;
             }
             let mut handles = vec![];
-            let count = Arc::new(RwLock::new(0));
-            let result = Arc::clone(&count);
+            let mut results:Vec<_> = vec![];
             (0..N * N).for_each(|state_number| {
-                let thread_count = Arc::clone(&count);
                 let handle = thread::spawn(move || {
                     if let Some(mut bs) = Self::get_board_state(state_number) {
-                        let thread_count_clone = Arc::clone(&thread_count.to_owned());
-                        let mut count = thread_count_clone.write().unwrap();
-                        *count += bs.try_place(2);
+                        return bs.try_place(2);
                     }
+                    0_u128
                 });
                 handles.push(handle);
             });
             for handle in handles {
-                handle.join().unwrap();
+                let result = handle.join().unwrap();
+                results.push(result);
             }
-            *result.read().unwrap()
+            results.iter().sum()
         }
     }
 }
-#[allow(unused_imports)]
-use board_solver::BoardSolver;
+
 use board_solver_multithreaded::BoardSolverMultithreaded;
 fn main() {
-    let bsmt = BoardSolverMultithreaded::<8>::new();
+    let bsmt = BoardSolverMultithreaded::<16>::new();
 
     let count = bsmt.solve();
 
@@ -198,8 +193,9 @@ fn main() {
 }
 mod tests {
 
-    #[cfg(test)]
+  #[cfg(test)]
     use super::*;
+    use crate::board_solver::BoardSolver;
     #[test]
     fn works_for_n_1_to_4() {
         let mut bs = BoardSolver::<1>::new();
