@@ -1,15 +1,11 @@
-use std::sync::{Arc, RwLock};
-
 pub mod board_solver {
-    use std::sync::{Arc, RwLock};
-    //use std::thread::Thread;
     const DEBUG: bool = false;
-
-    struct Board<const N: usize> {
+    #[derive(Clone, Copy)]
+    pub struct Board<const N: usize> {
         data: [[bool; N]; N],
         size: usize,
     }
-
+    #[derive(Clone, Copy)]
     pub struct BoardSolver<const N: usize> {
         board: Board<N>,
         left_diagonal: [[bool; N]; 2],
@@ -38,6 +34,7 @@ pub mod board_solver {
                 }
                 println!("");
             }
+            println!("");
         }
     }
 
@@ -65,98 +62,46 @@ pub mod board_solver {
                 r - ((size - 1) - c) + self.board.size - 1
             }
         }
-        pub fn solve(&mut self, count_reference: &mut u128) {
-            self.try_place(0, count_reference);
+        pub fn solve(&mut self) -> u128 {
+            self.try_place(0)
         }
-        pub fn try_place(&mut self, r: usize, count: &mut u128) {
-            let size = self.board.size;
-            if r == size {
-                *count += 1;
+        pub fn try_place(&mut self, row: usize) -> u128 {
+            let size = N;
+            if row == size {
                 if DEBUG {
                     self.board.print();
                     println!("");
                 }
-                return;
+                return 1;
             }
+            let mut count = 0;
             for column in 0..size {
-                let can_place = self.valid_placement(r, column);
+                let can_place = self.valid_placement(row, column);
                 if can_place {
-                    self.horizontal[column] = true;
-                    let left_diag_index = self.get_left_diagonal(r, column);
-                    let left_diag_row = left_diag_index / N;
-                    let left_diag_col = left_diag_index % N;
-
-                    let right_diag_index = self.get_right_diagonal(r, column);
-                    let right_diag_row = right_diag_index / N;
-                    let right_diag_col = right_diag_index % N;
-
-                    self.left_diagonal[left_diag_row][left_diag_col] = true;
-                    self.right_diagonal[right_diag_row][right_diag_col] = true;
+                    self.set_position(row, column, true);
 
                     if DEBUG {
-                        self.board.set(r, column);
+                        self.board.set(row, column);
                     }
 
-                    self.try_place(r + 1, count);
+                    count += self.try_place(row + 1);
 
                     if DEBUG {
-                        self.board.unset(r, column);
+                        self.board.unset(row, column);
                     }
 
-                    self.left_diagonal[left_diag_row][left_diag_col] = false;
-                    self.right_diagonal[right_diag_row][right_diag_col] = false;
-                    self.horizontal[column] = false;
+                    self.set_position(row, column, false);
                 }
             }
+            count
         }
-        pub fn try_place_mt(&mut self, r: usize, count: Arc<RwLock<u128>>) {
-            let size = self.board.size;
-            if r == size {
-                let clone = Arc::clone(&count);
-                let mut val = clone.write().unwrap();
-                *val += 1;
-                if DEBUG {
-                    self.board.print();
-                    println!("");
-                }
-                return;
-            }
-            for column in 0..size {
-                let can_place = self.valid_placement(r, column);
-                if can_place {
-                    self.horizontal[column] = true;
-                    let left_diag_index = self.get_left_diagonal(r, column);
-                    let left_diag_row = left_diag_index / N;
-                    let left_diag_col = left_diag_index % N;
-
-                    let right_diag_index = self.get_right_diagonal(r, column);
-                    let right_diag_row = right_diag_index / N;
-                    let right_diag_col = right_diag_index % N;
-
-                    self.left_diagonal[left_diag_row][left_diag_col] = true;
-                    self.right_diagonal[right_diag_row][right_diag_col] = true;
-
-                    if DEBUG {
-                        self.board.set(r, column);
-                    }
-
-                    self.try_place_mt(r + 1, Arc::clone(&count));
-
-                    if DEBUG {
-                        self.board.unset(r, column);
-                    }
-
-                    self.left_diagonal[left_diag_row][left_diag_col] = false;
-                    self.right_diagonal[right_diag_row][right_diag_col] = false;
-                    self.horizontal[column] = false;
-                }
-            }
+        pub fn set_board(&mut self, board: Board<N>) {
+            self.board = board;
         }
-        fn valid_placement(&self, r: usize, c: usize) -> bool {
+        pub fn valid_placement(&self, r: usize, c: usize) -> bool {
             if self.horizontal[c] == true {
                 return false;
             }
-            //let size = self.board.size;
             let left_diag_index = self.get_left_diagonal(r, c);
             let right_diag_index = self.get_right_diagonal(r, c);
 
@@ -173,109 +118,177 @@ pub mod board_solver {
             }
             true
         }
+        pub fn set_position(&mut self, r: usize, c: usize, state: bool) {
+            self.horizontal[c] = state;
+            let left_diag_index = self.get_left_diagonal(r, c);
+            let left_diag_row = left_diag_index / N;
+            let left_diag_col = left_diag_index % N;
+
+            let right_diag_index = self.get_right_diagonal(r, c);
+            let right_diag_row = right_diag_index / N;
+            let right_diag_col = right_diag_index % N;
+
+            self.left_diagonal[left_diag_row][left_diag_col] = state;
+            self.right_diagonal[right_diag_row][right_diag_col] = state;
+        }
     }
 }
-/*mod board_solver_multithreaded{
+mod board_solver_multithreaded {
     use crate::board_solver::BoardSolver;
-
-  pub struct BoardSolverMultithreaded{
-    board_solver:BoardSolver,
-    thread_count:u16,
-  }
-  impl BoardSolverMultithreaded{
-    pub fn new(size:usize)->Self{
-      Self { board_solver: BoardSolver::new(size), thread_count: 1 }
+    use std::sync::Arc;
+    use std::sync::RwLock;
+    use std::thread;
+    pub struct BoardSolverMultithreaded<const N: usize> {}
+    impl<const N: usize> BoardSolverMultithreaded<N> {
+        pub fn new() -> Self {
+            Self {}
+        }
+        fn get_board_state(state_number: usize) -> Option<BoardSolver<N>> {
+            assert!(
+                state_number < N * N,
+                "state_number must be within the range 0 to {}",
+                N * N - 1
+            );
+            let mut bs = BoardSolver::<N>::new();
+            //gets the first and second rows column positions
+            let row_0_index = state_number / N;
+            let row_1_index = state_number % N;
+            bs.set_position(0, row_0_index, true);
+            if bs.valid_placement(1, row_1_index) {
+                bs.set_position(1, row_1_index, true);
+                return Some(bs);
+            } else {
+                return None;
+            }
+        }
+        pub fn solve(&self) -> u128 {
+            if N == 1 {
+                return 1;
+            }
+            let mut handles = vec![];
+            let count = Arc::new(RwLock::new(0));
+            let result = Arc::clone(&count);
+            (0..N * N).for_each(|state_number| {
+                let thread_count = Arc::clone(&count);
+                let handle = thread::spawn(move || {
+                    if let Some(mut bs) = Self::get_board_state(state_number) {
+                        let thread_count_clone = Arc::clone(&thread_count.to_owned());
+                        let mut count = thread_count_clone.write().unwrap();
+                        *count += bs.try_place(2);
+                    }
+                });
+                handles.push(handle);
+            });
+            for handle in handles {
+                handle.join().unwrap();
+            }
+            *result.read().unwrap()
+        }
     }
-    pub fn with_thread_count(&self,count:u16)->Self{
-      Self { board_solver: self.board_solver, thread_count: count }
-    }
-  }
-}*/
-
+}
+#[allow(unused_imports)]
 use board_solver::BoardSolver;
+use board_solver_multithreaded::BoardSolverMultithreaded;
 fn main() {
-    let mut bs = BoardSolver::<8>::new();
-    let mut count = 0;
-    bs.try_place(0, &mut count);
-    println!("Solutions: {}", count);
+    let bsmt = BoardSolverMultithreaded::<8>::new();
 
-    let count = 0;
-    let arc_count = Arc::new(RwLock::new(count));
-    bs.try_place_mt(0, Arc::clone(&arc_count));
-    println!("Solutions: {}", arc_count.read().unwrap());
+    let count = bsmt.solve();
+
+    println!("count: {}", count);
 }
 mod tests {
+
     #[cfg(test)]
     use super::*;
     #[test]
     fn works_for_n_1_to_4() {
         let mut bs = BoardSolver::<1>::new();
-        let mut count = 0;
-        bs.solve(&mut count);
+        let count = bs.solve();
         assert!(count == 1, "solution for 1 invalid");
 
         let mut bs = BoardSolver::<2>::new();
-        let mut count = 0;
-        bs.solve(&mut count);
+        let count = bs.solve();
         assert!(count == 0, "solution for 2 invalid");
 
         let mut bs = BoardSolver::<3>::new();
-        let mut count = 0;
-        bs.solve(&mut count);
+        let count = bs.solve();
         assert!(count == 0, "solution for 3 invalid");
 
         let mut bs = BoardSolver::<4>::new();
-        let mut count = 0;
-        bs.solve(&mut count);
+        let count = bs.solve();
         assert!(count == 2, "solution for 4 invalid");
     }
 
     #[test]
     fn works_for_n_5_to_8() {
         let mut bs = BoardSolver::<5>::new();
-        let mut count = 0;
-        bs.solve(&mut count);
+        let count = bs.solve();
         assert!(count == 10, "solution for 5 invalid");
 
         let mut bs = BoardSolver::<6>::new();
-        let mut count = 0;
-        bs.solve(&mut count);
+        let count = bs.solve();
         assert!(count == 4, "solution for 6 invalid");
 
         let mut bs = BoardSolver::<7>::new();
-        let mut count = 0;
-        bs.solve(&mut count);
+        let count = bs.solve();
         assert!(count == 40, "solution for 7 invalid");
 
         let mut bs = BoardSolver::<8>::new();
-        let mut count = 0;
-        bs.solve(&mut count);
+        let count = bs.solve();
         assert!(count == 92, "solution for 8 invalid");
     }
     #[test]
     fn works_for_n_1_to_4_multithreaded() {
-        let mut bs = BoardSolver::<1>::new();
-        let count = Arc::<_>::new(RwLock::new(0));
-        bs.try_place_mt(0, Arc::clone(&count));
-        let count = *count.read().unwrap();
+        let bsmt = BoardSolverMultithreaded::<1>::new();
+        let count = bsmt.solve();
         assert!(count == 1, "solution for 1 invalid");
 
-        let mut bs = BoardSolver::<2>::new();
-        let count = Arc::<_>::new(RwLock::new(0));
-        bs.try_place_mt(0, Arc::clone(&count));
-        let count = *count.read().unwrap();
+        let bsmt = BoardSolverMultithreaded::<2>::new();
+        let count = bsmt.solve();
         assert!(count == 0, "solution for 2 invalid");
 
-        let mut bs = BoardSolver::<3>::new();
-        let count = Arc::<_>::new(RwLock::new(0));
-        bs.try_place_mt(0, Arc::clone(&count));
-        let count = *count.read().unwrap();
+        let bsmt = BoardSolverMultithreaded::<3>::new();
+        let count = bsmt.solve();
         assert!(count == 0, "solution for 3 invalid");
 
-        let mut bs = BoardSolver::<4>::new();
-        let count = Arc::<_>::new(RwLock::new(0));
-        bs.try_place_mt(0, Arc::clone(&count));
-        let count = *count.read().unwrap();
+        let bsmt = BoardSolverMultithreaded::<4>::new();
+        let count = bsmt.solve();
         assert!(count == 2, "solution for 4 invalid");
+    }
+    #[test]
+    fn works_for_n_5_to_8_multithreaded() {
+        let bsmt = BoardSolverMultithreaded::<5>::new();
+        let count = bsmt.solve();
+        assert!(count == 10, "solution for 5 invalid");
+
+        let bsmt = BoardSolverMultithreaded::<6>::new();
+        let count = bsmt.solve();
+        assert!(count == 4, "solution for 6 invalid");
+
+        let bsmt = BoardSolverMultithreaded::<7>::new();
+        let count = bsmt.solve();
+        assert!(count == 40, "solution for 7 invalid");
+
+        let bsmt = BoardSolverMultithreaded::<8>::new();
+        let count = bsmt.solve();
+        assert!(count == 92, "solution for 8 invalid");
+    }
+    #[test]
+    fn works_for_n_9_to_12_multithreaded() {
+        let bsmt = BoardSolverMultithreaded::<9>::new();
+        let count = bsmt.solve();
+        assert!(count == 352, "solution for 9 invalid");
+
+        let bsmt = BoardSolverMultithreaded::<10>::new();
+        let count = bsmt.solve();
+        assert!(count == 724, "solution for 10 invalid");
+
+        let bsmt = BoardSolverMultithreaded::<11>::new();
+        let count = bsmt.solve();
+        assert!(count == 2680, "solution for 11 invalid");
+
+        let bsmt = BoardSolverMultithreaded::<12>::new();
+        let count = bsmt.solve();
+        assert!(count == 14200, "solution for 12 invalid");
     }
 }
