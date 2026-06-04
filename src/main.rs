@@ -1,3 +1,4 @@
+#![allow(unused)]
 pub mod board_solver {
     const DEBUG: bool = false;
     #[derive(Clone, Copy)]
@@ -40,6 +41,7 @@ pub mod board_solver {
 
     impl<const N: usize> BoardSolver<N> {
         pub fn new() -> Self {
+            assert!(N > 0, "N must be 1 or above");
             Self {
                 board: Board::<N>::new(),
                 left_diagonal: [[false; N]; 2],
@@ -135,11 +137,24 @@ pub mod board_solver {
 }
 mod board_solver_multithreaded {
     use crate::board_solver::BoardSolver;
-    use std::thread;
-    pub struct BoardSolverMultithreaded<const N: usize> {}
+    use std::{sync::Arc, sync::RwLock, thread};
+    pub struct BoardSolverMultithreaded<const N: usize> {
+        thread_count: u32,
+    }
     impl<const N: usize> BoardSolverMultithreaded<N> {
         pub fn new() -> Self {
-            Self {}
+            let default_thread_count = 8_u32;
+            assert!(N > 0, "N must be 1 or above");
+            Self {
+                thread_count: default_thread_count,
+            }
+        }
+        pub fn with_thread_count(thread_count: u32) -> Self {
+            assert!(thread_count > 0, "thread_count must be 1 or above");
+            assert!(N > 0, "N must be 1 or above");
+            Self {
+                thread_count: thread_count,
+            }
         }
         fn get_board_state(state_number: usize) -> Option<BoardSolver<N>> {
             assert!(
@@ -159,19 +174,35 @@ mod board_solver_multithreaded {
                 return None;
             }
         }
+        pub fn solve_single_state(state_counter: Arc<RwLock<usize>>, limit: usize) -> u128 {
+            let state_number_lock = Arc::clone(&state_counter);
+            let state_number = {
+                let mut state_number_writer = state_number_lock.write().unwrap();
+                let original_state_number = state_number_writer.clone();
+                *state_number_writer += 1;
+                original_state_number
+            };
+            if state_number >= limit {
+                return 0;
+            }
+            let mut result = 0_u128;
+            if let Some(mut bs) = Self::get_board_state(state_number) {
+                result = bs.try_place(2);
+            }
+
+            result + Self::solve_single_state(state_counter, limit)
+        }
+
         pub fn solve(&self) -> u128 {
             if N == 1 {
                 return 1;
             }
             let mut handles = vec![];
-            let mut results:Vec<_> = vec![];
-            (0..N * N).for_each(|state_number| {
-                let handle = thread::spawn(move || {
-                    if let Some(mut bs) = Self::get_board_state(state_number) {
-                        return bs.try_place(2);
-                    }
-                    0_u128
-                });
+            let mut results: Vec<_> = vec![];
+            let state_counter = Arc::new(RwLock::new(0_usize));
+            (0..self.thread_count).for_each(|_| {
+                let state_counter_clone = Arc::clone(&state_counter);
+                let handle = thread::spawn(|| Self::solve_single_state(state_counter_clone, N * N));
                 handles.push(handle);
             });
             for handle in handles {
@@ -185,15 +216,13 @@ mod board_solver_multithreaded {
 
 use board_solver_multithreaded::BoardSolverMultithreaded;
 fn main() {
-    let bsmt = BoardSolverMultithreaded::<16>::new();
-
+    let bsmt = BoardSolverMultithreaded::<14>::with_thread_count(14);
     let count = bsmt.solve();
-
     println!("count: {}", count);
 }
 mod tests {
 
-  #[cfg(test)]
+    #[cfg(test)]
     use super::*;
     use crate::board_solver::BoardSolver;
     #[test]
