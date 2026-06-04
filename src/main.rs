@@ -316,4 +316,22 @@ mod tests {
         let count = bsmt.solve();
         assert!(count == 14200, "solution for 12 invalid");
     }
+    #[test]
+    fn works_for_n_9_to_12_multithreaded_different_thread_counts() {
+        let bsmt = BoardSolverMultithreaded::<9>::with_thread_count(8);
+        let count = bsmt.solve();
+        assert!(count == 352, "solution for 9 invalid");
+
+        let bsmt = BoardSolverMultithreaded::<10>::with_thread_count(16);
+        let count = bsmt.solve();
+        assert!(count == 724, "solution for 10 invalid");
+
+        let bsmt = BoardSolverMultithreaded::<11>::with_thread_count(32);
+        let count = bsmt.solve();
+        assert!(count == 2680, "solution for 11 invalid");
+
+        let bsmt = BoardSolverMultithreaded::<12>::with_thread_count(64);
+        let count = bsmt.solve();
+        assert!(count == 14200, "solution for 12 invalid");
+    }
 }
